@@ -1,0 +1,57 @@
+---
+title: "Practical Machine Learning Course Project"
+date: "01/24/2015"
+output: html_document
+---
+This project uses data from a Human Activity Recognition project <http://groupware.les.inf.puc-rio.br/har> and attempts to predict activity classes based on accelerometer data.
+
+#Load and Clean the Training Data, Partition into Training and Test Datasets
+
+```{r init, cache=T}
+# load data
+d <- read.table("pml-training.csv",header=T,sep=",",
+   na.strings=c("NA","","#DIV/0!"))
+
+# remove unneeded rows/columns
+d1 <- d[!d$new_window=="yes",8:length(d)]
+
+# http://stackoverflow.com/questions/10574061/show-columns-with-nas-in-a-data-frame
+nacols <- function(df) {
+   colnames(df)[unlist(lapply(df, function(x) any(is.na(x))))]
+}
+
+# remove any columns with NAs
+drops <- nacols(d1)
+d2 <- d1[,!(names(d1) %in% drops)]
+
+library(caret)
+inTrain <- createDataPartition(y=d2$classe,p=0.75,list=F)
+training <- d2[inTrain,]
+testing <- d2[-inTrain,]
+dim(training)
+dim(testing)
+```
+
+#Build a Model
+
+I initially experimented with neural network models, but got better results with Random Forest. Here I am using RF with a Principal Components Analysis preprocessing step, and 5 fold Cross Validation.
+
+```{r rforest1, cache=T}
+# try RandomForest
+rfmodel<-train(classe~.,data=training,method="rf",preProcess="pca",prox=T,allowParallel=T,
+   trControl=trainControl(method="cv",number=5))
+rfmodel
+```
+
+I'm getting about 97% accuracy with this model, so I'm expecting an out of sample error rate of about 3%.
+
+#Check the Model Against the Test Dataset (simulated out of sample)
+
+```{r rforest2, cache=T}
+predictions <- predict(rfmodel,newdata=testing[,1:52])
+confusionMatrix(predictions,testing$classe)
+```
+
+#Conclusions
+
+Accuracy on the test dataset is almost 98%... not too bad.
